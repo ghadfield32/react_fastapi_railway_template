@@ -231,14 +231,21 @@ This script will:
    - **Prevention**: Always commit both files together
    - **Validation**: Run `npm run pre-deploy` before deploying
 
-4. **CORS errors**:
+4. **"EBUSY: resource busy or locked" / Cache conflicts**:
+   - **Root cause**: Docker cache mount conflicts with npm cache
+   - **Fix**: Use simplified Railway configuration without custom buildCommand
+   - **Alternative**: Use Dockerfile-based deployment (see railway.alternative.json)
+   - **Debug**: Run `npm run debug:railway` to simulate build process
+
+5. **CORS errors**:
    - Verify `VITE_API_URL` points to correct backend URL
    - Check CORS configuration in FastAPI app
 
-5. **Build failures**:
+6. **Build failures**:
    - Check Railway build logs
    - Ensure all dependencies are in `requirements.txt`/`package.json`
    - Run `npm run pre-deploy` to validate locally
+   - Use `npm run debug:railway` to simulate Railway build process
 
 ### Debug Commands
 
@@ -255,6 +262,9 @@ railway redeploy --service fastapi-backend
 
 # Check service status
 railway status
+
+# Debug build process locally
+npm run debug:railway
 ```
 
 ## Production Considerations

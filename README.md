@@ -99,6 +99,12 @@ npm run dev
 
 ### Method 1: Deploy from GitHub (Recommended)
 
+Always run npm run pre-deploy before deploying
+
+```bash
+npm run pre-deploy
+```
+
 1. **Push your code to GitHub**
    ```bash
    git add .

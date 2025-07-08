@@ -21,7 +21,8 @@
     "railway:logs": "railway logs",
     "railway:status": "railway status",
     "test:railway": "scripts\\test-config-only.bat",
-    "pre-deploy": "scripts\\pre-deploy-check.bat"
+    "pre-deploy": "scripts\\pre-deploy-check.bat",
+    "debug:railway": "scripts\\debug-railway-build.bat"
   },
   "devDependencies": {
     "npm-run-all": "^4.1.5"
