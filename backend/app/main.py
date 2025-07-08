@@ -179,4 +179,5 @@ async def internal_error_handler(request, exc):
 if __name__ == "__main__":
     import uvicorn
     port = int(os.getenv("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port) 
+    host = "0.0.0.0"  # Railway requires binding to 0.0.0.0
+    uvicorn.run(app, host=host, port=port) 
