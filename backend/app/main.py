@@ -62,6 +62,33 @@ logger.info(f"🔍 DEBUG: RAILWAY_ENVIRONMENT: {os.getenv('RAILWAY_ENVIRONMENT')
 logger.info(f"🔍 DEBUG: ENVIRONMENT: {os.getenv('ENVIRONMENT')}")
 logger.info(f"🔍 DEBUG: FRONTEND_URL: {os.getenv('FRONTEND_URL')}")
 
+# Add Railway-specific debugging
+logger.info("🔍 DEBUG: === RAILWAY ENVIRONMENT ANALYSIS ===")
+railway_vars = {
+    'RAILWAY_ENVIRONMENT': os.getenv('RAILWAY_ENVIRONMENT'),
+    'RAILWAY_PUBLIC_DOMAIN': os.getenv('RAILWAY_PUBLIC_DOMAIN'),
+    'RAILWAY_PRIVATE_DOMAIN': os.getenv('RAILWAY_PRIVATE_DOMAIN'),
+    'RAILWAY_SERVICE_NAME': os.getenv('RAILWAY_SERVICE_NAME'),
+    'RAILWAY_DEPLOYMENT_ID': os.getenv('RAILWAY_DEPLOYMENT_ID'),
+    'RAILWAY_PROJECT_ID': os.getenv('RAILWAY_PROJECT_ID'),
+    'PORT': os.getenv('PORT')
+}
+for key, value in railway_vars.items():
+    logger.info(f"🔍 DEBUG: {key}: {value}")
+
+# Check build-time environment
+logger.info("🔍 DEBUG: === BUILD ENVIRONMENT ANALYSIS ===")
+build_vars = {
+    'PWD': os.getenv('PWD'),
+    'HOME': os.getenv('HOME'),
+    'PATH': os.getenv('PATH')[:200] + '...' if os.getenv('PATH') else None,  # Truncate PATH
+    'NODE_ENV': os.getenv('NODE_ENV'),
+    'NIXPACKS_METADATA': os.getenv('NIXPACKS_METADATA'),
+    'NIXPACKS_PLAN': os.getenv('NIXPACKS_PLAN')
+}
+for key, value in build_vars.items():
+    logger.info(f"🔍 DEBUG: {key}: {value}")
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -154,9 +181,64 @@ async def predict(request: PredictionRequest):
 # Static files serving for React app
 # Check if frontend build exists
 frontend_build_path = Path("frontend/dist")
+
+# Add comprehensive debugging
+logger.info("🔍 DEBUG: === FRONTEND BUILD DIRECTORY ANALYSIS ===")
+logger.info(f"🔍 DEBUG: Current working directory: {os.getcwd()}")
+logger.info(f"🔍 DEBUG: Checking for frontend build at: {frontend_build_path.absolute()}")
+logger.info(f"🔍 DEBUG: Frontend build path exists: {frontend_build_path.exists()}")
+
+# Check parent directory structure
+frontend_parent = Path("frontend")
+logger.info(f"🔍 DEBUG: Frontend parent directory exists: {frontend_parent.exists()}")
+if frontend_parent.exists():
+    try:
+        frontend_contents = list(frontend_parent.iterdir())
+        logger.info(f"🔍 DEBUG: Frontend directory contents: {[str(p) for p in frontend_contents]}")
+    except Exception as e:
+        logger.error(f"🔍 DEBUG: Error listing frontend directory: {e}")
+
+# Check root directory structure
+root_path = Path(".")
+try:
+    root_contents = [p for p in root_path.iterdir() if p.is_dir()]
+    logger.info(f"🔍 DEBUG: Root directory folders: {[str(p) for p in root_contents]}")
+except Exception as e:
+    logger.error(f"🔍 DEBUG: Error listing root directory: {e}")
+
+# Check if dist exists but in wrong location
+possible_dist_paths = [
+    Path("dist"),
+    Path("./dist"),
+    Path("../frontend/dist"),
+    Path("frontend/build"),
+    Path("build")
+]
+logger.info("🔍 DEBUG: Checking alternative dist locations:")
+for path in possible_dist_paths:
+    logger.info(f"🔍 DEBUG: {path.absolute()}: {path.exists()}")
+
 if frontend_build_path.exists():
+    logger.info("🔍 DEBUG: === FRONTEND BUILD FOUND - SETTING UP STATIC FILES ===")
+    
+    # Additional debug for static files
+    dist_contents = list(frontend_build_path.iterdir())
+    logger.info(f"🔍 DEBUG: Dist directory contents: {[str(p) for p in dist_contents]}")
+    
+    # Check for index.html specifically
+    index_file = frontend_build_path / "index.html"
+    logger.info(f"🔍 DEBUG: Index.html exists: {index_file.exists()}")
+    
+    # Check for assets directory
+    assets_dir = frontend_build_path / "assets"
+    logger.info(f"🔍 DEBUG: Assets directory exists: {assets_dir.exists()}")
+    if assets_dir.exists():
+        assets_contents = list(assets_dir.iterdir())
+        logger.info(f"🔍 DEBUG: Assets directory contents: {[str(p) for p in assets_contents]}")
+    
     # Mount static files
     app.mount("/static", StaticFiles(directory="frontend/dist/assets"), name="static")
+    logger.info("🔍 DEBUG: Static files mounted at /static")
     
     # Serve React app for all other routes (SPA routing)
     @app.get("/{full_path:path}")
@@ -165,22 +247,29 @@ if frontend_build_path.exists():
         Serve React app for all non-API routes
         This enables client-side routing
         """
+        logger.info(f"🔍 DEBUG: Serving React app for path: {full_path}")
+        
         # Don't serve React app for API routes
         if full_path.startswith("api/"):
+            logger.info(f"🔍 DEBUG: Rejecting API path: {full_path}")
             raise HTTPException(status_code=404, detail="API endpoint not found")
         
         # Serve index.html for all other routes
         index_file = frontend_build_path / "index.html"
         if index_file.exists():
+            logger.info(f"🔍 DEBUG: Serving index.html for path: {full_path}")
             return FileResponse(index_file)
         else:
+            logger.error(f"🔍 DEBUG: Index.html not found at: {index_file}")
             raise HTTPException(status_code=404, detail="Frontend not found")
 else:
+    logger.warning("🔍 DEBUG: === FRONTEND BUILD NOT FOUND - USING JSON FALLBACK ===")
     logger.warning("Frontend build directory not found. React app will not be served.")
     
     @app.get("/")
     async def root():
         """Root endpoint when frontend is not built"""
+        logger.info("🔍 DEBUG: Serving JSON root endpoint")
         return {
             "message": "FastAPI backend is running",
             "docs": "/api/docs",

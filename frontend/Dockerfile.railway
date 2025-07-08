@@ -1,8 +1,7 @@
 # Railway Frontend Dockerfile
 # =========================
 # This Dockerfile implements an optimized build process with proper caching:
-# - Uses BuildKit's cache mount for global npm cache (~/.npm)
-# - Avoids mounting node_modules/.cache to prevent EBUSY errors
+# - Uses explicit cache paths to avoid conflicts with Railway's build system
 # - Implements multi-stage build for better layer caching
 # - Separates dependency installation from build for better caching
 
@@ -15,10 +14,9 @@ WORKDIR /app
 # Copy package files first (for better layer caching)
 COPY package*.json ./
 
-# Install dependencies with global npm cache mount
-# We only mount ~/.npm to avoid EBUSY errors with node_modules/.cache
-RUN --mount=type=cache,id=npm-global-cache,target=/root/.npm \
-    npm ci --prefer-offline --no-audit --loglevel=error
+# Install dependencies
+# We avoid mounting any caches under node_modules to prevent EBUSY errors
+RUN npm ci --prefer-offline --no-audit --loglevel=error
 
 # Copy source code and build
 # This is separate from npm ci so source changes don't invalidate dependency cache
