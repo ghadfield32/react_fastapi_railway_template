@@ -1,7 +1,7 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 import os
 from pathlib import Path
@@ -189,15 +189,21 @@ else:
 
 # Exception handlers
 @app.exception_handler(404)
-async def not_found_handler(request, exc):
+async def not_found_handler(request: Request, exc: HTTPException):
     """Custom 404 handler"""
-    return {"error": "Not found", "path": str(request.url)}
+    return JSONResponse(
+        status_code=404,
+        content={"error": "Not found", "path": str(request.url)}
+    )
 
 @app.exception_handler(500)
-async def internal_error_handler(request, exc):
+async def internal_error_handler(request: Request, exc: Exception):
     """Custom 500 handler"""
     logger.error(f"Internal server error: {exc}")
-    return {"error": "Internal server error"}
+    return JSONResponse(
+        status_code=500,
+        content={"error": "Internal server error"}
+    )
 
 if __name__ == "__main__":
     import uvicorn
