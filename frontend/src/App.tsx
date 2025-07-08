@@ -33,30 +33,82 @@ function App() {
   const [error, setError] = useState<string>('')
   const [predictionResult, setPredictionResult] = useState<PredictionResponse | null>(null)
 
-  // Get API URL from environment variable with fallback
-  const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://fastapi-production-1d13.up.railway.app'
+  // Define backend URL with multiple fallback layers
+  const getBackendUrl = () => {
+    // First try: Environment variable from build time
+    if (import.meta.env.VITE_API_URL) {
+      return import.meta.env.VITE_API_URL
+    }
+    
+    // Second try: Runtime detection (if we're in production)
+    if (import.meta.env.PROD) {
+      return 'https://fastapi-production-1d13.up.railway.app'
+    }
+    
+    // Third try: Development fallback
+    return 'http://127.0.0.1:8000'
+  }
+  
+  const BACKEND_URL = getBackendUrl()
+  
   const getApiUrl = (endpoint: string) => {
-    // In development, use proxy path
+    // In development, use proxy path (Vite handles /api routing)
     if (import.meta.env.DEV) {
+      console.log('🔍 DEV MODE: Using proxy path:', endpoint)
       return endpoint
     }
-    // In production, use full URL - ensure we have a valid base URL
-    const baseUrl = API_BASE_URL || 'https://fastapi-production-1d13.up.railway.app'
-    return `${baseUrl}${endpoint}`
+    
+    // In production, ALWAYS use absolute URL
+    let backendUrl = BACKEND_URL
+    
+    // Ensure we have a valid URL
+    if (!backendUrl || backendUrl === '' || backendUrl === 'undefined') {
+      console.warn('🔍 FALLBACK: Backend URL is invalid, using hardcoded fallback')
+      backendUrl = 'https://fastapi-production-1d13.up.railway.app'
+    }
+    
+    // Clean the backend URL (remove trailing slash)
+    const cleanBackendUrl = backendUrl.replace(/\/$/, '')
+    
+    // Ensure endpoint starts with /
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`
+    
+    // Construct the full URL
+    const fullUrl = `${cleanBackendUrl}${cleanEndpoint}`
+    
+    console.log('🔍 PROD MODE: Constructing URL:', {
+      originalBackendUrl: BACKEND_URL,
+      backendUrl,
+      cleanBackendUrl,
+      endpoint,
+      cleanEndpoint,
+      fullUrl,
+      isAbsolute: fullUrl.startsWith('http')
+    })
+    
+    // Final validation - ensure we have an absolute URL
+    if (!fullUrl.startsWith('http')) {
+      console.error('🔍 ERROR: Generated URL is not absolute!', fullUrl)
+      const fallbackUrl = `https://fastapi-production-1d13.up.railway.app${cleanEndpoint}`
+      console.warn('🔍 FALLBACK: Using hardcoded URL:', fallbackUrl)
+      return fallbackUrl
+    }
+    
+    return fullUrl
   }
 
   console.log('🔍 App Debug Info:')
   console.log('Mode:', import.meta.env.MODE)
   console.log('DEV:', import.meta.env.DEV)
   console.log('PROD:', import.meta.env.PROD)
-  console.log('API_BASE_URL:', API_BASE_URL)
+  console.log('BACKEND_URL:', BACKEND_URL)
   
   // Add comprehensive debugging
   console.log('🔍 COMPREHENSIVE DEBUG INFO:')
   console.log('import.meta.env.VITE_API_URL:', import.meta.env.VITE_API_URL)
   console.log('typeof import.meta.env.VITE_API_URL:', typeof import.meta.env.VITE_API_URL)
-  console.log('API_BASE_URL length:', API_BASE_URL.length)
-  console.log('API_BASE_URL === "":', API_BASE_URL === '')
+  console.log('BACKEND_URL length:', BACKEND_URL.length)
+  console.log('BACKEND_URL === "":', BACKEND_URL === '')
   console.log('Sample API URL generation:')
   console.log('  /api/hello ->', getApiUrl('/api/hello'))
   console.log('  /api/predict ->', getApiUrl('/api/predict'))
@@ -64,8 +116,60 @@ function App() {
   console.log('All import.meta.env keys:', Object.keys(import.meta.env))
   console.log('All import.meta.env values:', import.meta.env)
 
+  // Runtime URL validation
+  const validateApiUrl = (url: string) => {
+    try {
+      const urlObj = new URL(url)
+      const isValid = urlObj.protocol === 'https:' || urlObj.protocol === 'http:'
+      console.log('🔍 URL VALIDATION:', {
+        url,
+        isValid,
+        protocol: urlObj.protocol,
+        hostname: urlObj.hostname,
+        pathname: urlObj.pathname
+      })
+      return isValid
+    } catch (e) {
+      console.error('🔍 URL VALIDATION ERROR:', { url, error: e })
+      return false
+    }
+  }
+
+  // Validate our generated URLs
+  useEffect(() => {
+    const testUrls = ['/api/hello', '/api/info', '/api/predict']
+    testUrls.forEach(endpoint => {
+      const generatedUrl = getApiUrl(endpoint)
+      validateApiUrl(generatedUrl)
+    })
+  }, [])
+
+  // Enhanced fetch with better error handling
+  const fetchWithDebug = async (url: string, options: RequestInit = {}) => {
+    console.log('🔍 FETCH DEBUG: Starting request to:', url)
+    console.log('🔍 FETCH DEBUG: Request options:', options)
+    
+    try {
+      const response = await fetch(url, options)
+      console.log('🔍 FETCH DEBUG: Response received:', {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        url: response.url
+      })
+      
+      return response
+    } catch (error) {
+      console.error('🔍 FETCH DEBUG: Network error:', error)
+      throw error
+    }
+  }
+
   // Fetch API message on component mount
   useEffect(() => {
+    // Run URL generation test first
+    testUrlGeneration()
+    
     fetchApiMessage()
     fetchAppInfo()
   }, [])
@@ -77,7 +181,12 @@ function App() {
       const url = getApiUrl('/api/hello')
       console.log('🔍 DEBUG: Fetching from URL:', url)
       
-      const response = await fetch(url)
+      // Validate URL before making request
+      if (!validateApiUrl(url)) {
+        throw new Error(`Invalid URL generated: ${url}`)
+      }
+      
+      const response = await fetchWithDebug(url)
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
@@ -96,7 +205,13 @@ function App() {
       const url = getApiUrl('/api/info')
       console.log('🔍 DEBUG: Fetching app info from URL:', url)
       
-      const response = await fetch(url)
+      // Validate URL before making request
+      if (!validateApiUrl(url)) {
+        console.error('Invalid URL generated for app info:', url)
+        return
+      }
+      
+      const response = await fetchWithDebug(url)
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
@@ -123,7 +238,7 @@ function App() {
       console.log('🔍 DEBUG: Making prediction request to:', url)
       console.log('🔍 DEBUG: Request data:', requestData)
       
-      const response = await fetch(url, {
+      const response = await fetchWithDebug(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -174,7 +289,7 @@ function App() {
     console.log('🔍 DIAGNOSTIC: Health check URL:', testUrl)
     
     try {
-      const response = await fetch(testUrl)
+      const response = await fetchWithDebug(testUrl)
       console.log('🔍 DIAGNOSTIC: Health check response status:', response.status)
       console.log('🔍 DIAGNOSTIC: Health check response headers:', Object.fromEntries(response.headers.entries()))
       
@@ -195,7 +310,7 @@ function App() {
     // Test 2: Check CORS preflight
     console.log('🔍 DIAGNOSTIC: Testing CORS preflight...')
     try {
-      const corsResponse = await fetch(testUrl, {
+      const corsResponse = await fetchWithDebug(testUrl, {
         method: 'OPTIONS',
         headers: {
           'Access-Control-Request-Method': 'GET',
@@ -207,6 +322,33 @@ function App() {
     } catch (error) {
       console.error('🔍 DIAGNOSTIC: CORS preflight failed:', error)
     }
+  }
+
+  // Comprehensive URL testing function
+  const testUrlGeneration = () => {
+    console.log('🔍 TESTING URL GENERATION...')
+    
+    const testEndpoints = [
+      '/api/hello',
+      '/api/info',
+      '/api/health',
+      '/api/predict',
+      'api/hello', // without leading slash
+      '/api/docs'
+    ]
+    
+    testEndpoints.forEach(endpoint => {
+      const generatedUrl = getApiUrl(endpoint)
+      const isValid = validateApiUrl(generatedUrl)
+      
+      console.log('🔍 URL TEST:', {
+        endpoint,
+        generatedUrl,
+        isValid,
+        isAbsolute: generatedUrl.startsWith('http'),
+        containsBackend: generatedUrl.includes('fastapi-production-1d13.up.railway.app')
+      })
+    })
   }
 
   return (
@@ -233,6 +375,9 @@ function App() {
           </button>
           <button onClick={runDiagnostics} disabled={isLoading}>
             Run Diagnostics
+          </button>
+          <button onClick={testUrlGeneration} disabled={isLoading}>
+            Test URL Generation
           </button>
         </div>
       </div>
