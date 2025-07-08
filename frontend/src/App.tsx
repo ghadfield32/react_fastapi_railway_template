@@ -33,6 +33,23 @@ function App() {
   const [error, setError] = useState<string>('')
   const [predictionResult, setPredictionResult] = useState<PredictionResponse | null>(null)
 
+  // Get API URL from environment variable or use proxy path
+  const API_BASE_URL = import.meta.env.VITE_API_URL || ''
+  const getApiUrl = (endpoint: string) => {
+    // In development, use proxy path
+    if (import.meta.env.DEV) {
+      return endpoint
+    }
+    // In production, use full URL
+    return `${API_BASE_URL}${endpoint}`
+  }
+
+  console.log('🔍 App Debug Info:')
+  console.log('Mode:', import.meta.env.MODE)
+  console.log('DEV:', import.meta.env.DEV)
+  console.log('PROD:', import.meta.env.PROD)
+  console.log('API_BASE_URL:', API_BASE_URL)
+
   // Fetch API message on component mount
   useEffect(() => {
     fetchApiMessage()
@@ -43,7 +60,10 @@ function App() {
     try {
       setIsLoading(true)
       setError('')
-      const response = await fetch('/api/hello')
+      const url = getApiUrl('/api/hello')
+      console.log('🔍 DEBUG: Fetching from URL:', url)
+      
+      const response = await fetch(url)
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
@@ -59,7 +79,10 @@ function App() {
 
   const fetchAppInfo = async () => {
     try {
-      const response = await fetch('/api/info')
+      const url = getApiUrl('/api/info')
+      console.log('🔍 DEBUG: Fetching app info from URL:', url)
+      
+      const response = await fetch(url)
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`)
       }
@@ -82,7 +105,11 @@ function App() {
         }
       }
       
-      const response = await fetch('/api/predict', {
+      const url = getApiUrl('/api/predict')
+      console.log('🔍 DEBUG: Making prediction request to:', url)
+      console.log('🔍 DEBUG: Request data:', requestData)
+      
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -90,15 +117,35 @@ function App() {
         body: JSON.stringify(requestData)
       })
       
+      console.log('🔍 DEBUG: Response status:', response.status)
+      console.log('🔍 DEBUG: Response headers:', Object.fromEntries(response.headers.entries()))
+      
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+        // Get the response text to see what error we're getting
+        const errorText = await response.text()
+        console.log('🔍 DEBUG: Error response text:', errorText)
+        throw new Error(`HTTP error! status: ${response.status}, response: ${errorText}`)
       }
       
-      const data: PredictionResponse = await response.json()
+      // Get the response as text first to see what we're actually getting
+      const responseText = await response.text()
+      console.log('🔍 DEBUG: Raw response text:', responseText)
+      
+      // Try to parse it as JSON
+      let data: PredictionResponse
+      try {
+        data = JSON.parse(responseText)
+        console.log('🔍 DEBUG: Successfully parsed JSON:', data)
+      } catch (parseError) {
+        console.error('🔍 DEBUG: JSON parse error:', parseError)
+        console.error('🔍 DEBUG: Response text that failed to parse:', responseText)
+        throw new Error(`Failed to parse JSON response: ${parseError instanceof Error ? parseError.message : 'Unknown parse error'}. Response was: ${responseText}`)
+      }
+      
       setPredictionResult(data)
     } catch (err) {
       setError(`Prediction failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
-      console.error('Error making prediction:', err)
+      console.error('🔍 DEBUG: Full error object:', err)
     } finally {
       setIsLoading(false)
     }

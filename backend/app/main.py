@@ -27,9 +27,15 @@ origins = [
     "http://localhost:3000",  # React development server (Create React App)
     "http://localhost:5173",  # React development server (Vite)
     "http://localhost:5174",  # Alternative Vite port
+    "http://127.0.0.1:5173",  # Alternative localhost format
+    "http://127.0.0.1:5174",  # Alternative localhost format
     "https://localhost:3000",
     "https://localhost:5173",
 ]
+
+# Add Railway production URLs
+railway_frontend_url = "https://react-frontend-production-2805.up.railway.app"
+origins.append(railway_frontend_url)
 
 # Add Railway domains and environment-specific origins
 if os.getenv("RAILWAY_ENVIRONMENT"):
@@ -46,9 +52,15 @@ frontend_url = os.getenv("FRONTEND_URL")
 if frontend_url:
     origins.append(frontend_url)
 
-# In development, allow all origins
-if os.getenv("ENVIRONMENT") == "development":
+# In development, allow all origins for easier debugging
+if os.getenv("ENVIRONMENT") == "development" or not os.getenv("RAILWAY_ENVIRONMENT"):
     origins = ["*"]
+
+# Log CORS configuration for debugging
+logger.info(f"🔍 DEBUG: CORS origins configured: {origins}")
+logger.info(f"🔍 DEBUG: RAILWAY_ENVIRONMENT: {os.getenv('RAILWAY_ENVIRONMENT')}")
+logger.info(f"🔍 DEBUG: ENVIRONMENT: {os.getenv('ENVIRONMENT')}")
+logger.info(f"🔍 DEBUG: FRONTEND_URL: {os.getenv('FRONTEND_URL')}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -111,6 +123,10 @@ async def predict(request: PredictionRequest):
     Replace this with your actual ML model logic
     """
     try:
+        logger.info("🔍 DEBUG: Received prediction request")
+        logger.info(f"🔍 DEBUG: Request data: {request.data}")
+        logger.info(f"🔍 DEBUG: Request type: {type(request)}")
+        
         # Placeholder prediction logic
         # In a real app, you'd load your model and make predictions
         prediction_result = {
@@ -119,13 +135,20 @@ async def predict(request: PredictionRequest):
             "model_version": "v1.0.0"
         }
         
-        logger.info(f"Prediction request: {request.data}")
-        logger.info(f"Prediction result: {prediction_result}")
+        logger.info(f"🔍 DEBUG: Prediction result: {prediction_result}")
         
-        return PredictionResponse(**prediction_result)
+        response = PredictionResponse(**prediction_result)
+        logger.info(f"🔍 DEBUG: Response object: {response}")
+        logger.info(f"🔍 DEBUG: Response dict: {response.dict()}")
+        
+        return response
     
     except Exception as e:
-        logger.error(f"Prediction error: {str(e)}")
+        logger.error(f"🔍 DEBUG: Exception in predict endpoint: {str(e)}")
+        logger.error(f"🔍 DEBUG: Exception type: {type(e)}")
+        logger.error(f"🔍 DEBUG: Exception args: {e.args}")
+        import traceback
+        logger.error(f"🔍 DEBUG: Full traceback: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
 
 # Static files serving for React app
