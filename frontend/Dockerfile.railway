@@ -1,26 +1,40 @@
 # Railway Frontend Dockerfile
 # =========================
-# Simple Dockerfile that avoids cache conflicts
+# This Dockerfile implements an optimized build process with proper caching:
+# - Uses BuildKit's cache mount for global npm cache (~/.npm)
+# - Avoids mounting node_modules/.cache to prevent EBUSY errors
+# - Implements multi-stage build for better layer caching
+# - Separates dependency installation from build for better caching
 
-FROM node:18-alpine
+# BUILD STAGE
+FROM node:18-alpine AS build
 
 # Set working directory
 WORKDIR /app
 
-# Copy package files
+# Copy package files first (for better layer caching)
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --prefer-offline --no-audit --loglevel=error
+# Install dependencies with global npm cache mount
+# We only mount ~/.npm to avoid EBUSY errors with node_modules/.cache
+RUN --mount=type=cache,id=npm-global-cache,target=/root/.npm \
+    npm ci --prefer-offline --no-audit --loglevel=error
 
-# Copy source code
+# Copy source code and build
+# This is separate from npm ci so source changes don't invalidate dependency cache
 COPY . .
-
-# Build the application
 RUN npm run build
+
+# SERVE STAGE
+FROM node:18-alpine
+
+WORKDIR /app
 
 # Install serve globally
 RUN npm install -g serve
+
+# Copy only the built assets from build stage
+COPY --from=build /app/dist ./dist
 
 # Expose port
 EXPOSE $PORT
