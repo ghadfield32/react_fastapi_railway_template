@@ -36,6 +36,22 @@ react_fastapi_railway_template/
 
 ## Testing Before Deployment
 
+### Pre-Deployment Validation (Recommended)
+
+Run the comprehensive pre-deployment check:
+
+```bash
+npm run pre-deploy
+```
+
+This script validates:
+- ✅ Package-lock.json synchronization
+- ✅ Dependencies and build process
+- ✅ Railway configuration files
+- ✅ Backend and frontend functionality
+
+### Railway Environment Testing
+
 Run the Railway test script to verify your configuration:
 
 **Windows:**
@@ -209,13 +225,20 @@ This script will:
    - Old configuration issue - ensure frontend uses `npx serve`
    - Remove any Python files from frontend directory
 
-3. **CORS errors**:
+3. **"npm ci failed - package-lock.json out of sync"**:
+   - **Root cause**: `package.json` and `package-lock.json` are not synchronized
+   - **Fix**: Run `npm install` to update `package-lock.json`
+   - **Prevention**: Always commit both files together
+   - **Validation**: Run `npm run pre-deploy` before deploying
+
+4. **CORS errors**:
    - Verify `VITE_API_URL` points to correct backend URL
    - Check CORS configuration in FastAPI app
 
-4. **Build failures**:
+5. **Build failures**:
    - Check Railway build logs
    - Ensure all dependencies are in `requirements.txt`/`package.json`
+   - Run `npm run pre-deploy` to validate locally
 
 ### Debug Commands
 
