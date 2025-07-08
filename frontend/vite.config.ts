@@ -17,6 +17,14 @@ export default defineConfig(({ mode }) => {
   console.log('Mode:', mode)
   console.log('API_URL:', API_URL)
   console.log('VITE_API_URL from env:', env.VITE_API_URL)
+  console.log('All VITE_ env vars:', Object.keys(env).filter(key => key.startsWith('VITE_')))
+  console.log('NODE_ENV:', process.env.NODE_ENV)
+  console.log('PWD:', process.env.PWD)
+  console.log('Railway vars:', {
+    RAILWAY_ENVIRONMENT: process.env.RAILWAY_ENVIRONMENT,
+    RAILWAY_PROJECT_ID: process.env.RAILWAY_PROJECT_ID,
+    RAILWAY_SERVICE_NAME: process.env.RAILWAY_SERVICE_NAME
+  })
 
   return {
     plugins: [react()],

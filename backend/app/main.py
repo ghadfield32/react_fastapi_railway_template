@@ -182,8 +182,9 @@ async def predict(request: PredictionRequest):
 # Check if frontend build exists
 # frontend_build_path = Path("frontend/dist")
 # In Railway, the code lives under /app/app, so we use this ENV or fallback.
-FRONTEND_ROOT = os.getenv("FRONTEND_ROOT", "app/frontend")
-frontend_build_path = Path(FRONTEND_ROOT) / "dist"
+# FRONTEND_ROOT = os.getenv("FRONTEND_ROOT", "app/frontend")
+# frontend_build_path = Path(FRONTEND_ROOT) / "dist"
+frontend_build_path = Path("frontend/dist")
 
 # Add comprehensive debugging
 logger.info("🔍 DEBUG: === FRONTEND BUILD DIRECTORY ANALYSIS ===")

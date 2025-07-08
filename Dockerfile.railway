@@ -18,10 +18,25 @@ COPY package*.json ./
 # We avoid mounting any caches under node_modules to prevent EBUSY errors
 RUN npm ci --prefer-offline --no-audit --loglevel=error
 
-# Copy source code and build
-# This is separate from npm ci so source changes don't invalidate dependency cache
+# Copy source code
 COPY . .
+
+# Build with environment variables
+# Railway provides these at build time, but we need to make sure they're available
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+
+# Debug: Show what environment variables are available during build
+RUN echo "🔍 BUILD DEBUG: VITE_API_URL = $VITE_API_URL"
+RUN echo "🔍 BUILD DEBUG: All ENV vars:" && env | grep -E "(VITE_|NODE_|RAILWAY_)" || true
+
+# Build the application
 RUN npm run build
+
+# Debug: Check if the build contains the correct API URL
+RUN echo "🔍 BUILD DEBUG: Checking built files for API URL..." && \
+    find dist -name "*.js" -exec grep -l "fastapi-production-1d13.up.railway.app" {} \; || \
+    echo "🔍 BUILD DEBUG: API URL not found in built files"
 
 # SERVE STAGE
 FROM node:18-alpine

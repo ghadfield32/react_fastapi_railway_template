@@ -33,15 +33,16 @@ function App() {
   const [error, setError] = useState<string>('')
   const [predictionResult, setPredictionResult] = useState<PredictionResponse | null>(null)
 
-  // Get API URL from environment variable or use proxy path
-  const API_BASE_URL = import.meta.env.VITE_API_URL || ''
+  // Get API URL from environment variable with fallback
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'https://fastapi-production-1d13.up.railway.app'
   const getApiUrl = (endpoint: string) => {
     // In development, use proxy path
     if (import.meta.env.DEV) {
       return endpoint
     }
-    // In production, use full URL
-    return `${API_BASE_URL}${endpoint}`
+    // In production, use full URL - ensure we have a valid base URL
+    const baseUrl = API_BASE_URL || 'https://fastapi-production-1d13.up.railway.app'
+    return `${baseUrl}${endpoint}`
   }
 
   console.log('🔍 App Debug Info:')
@@ -49,6 +50,19 @@ function App() {
   console.log('DEV:', import.meta.env.DEV)
   console.log('PROD:', import.meta.env.PROD)
   console.log('API_BASE_URL:', API_BASE_URL)
+  
+  // Add comprehensive debugging
+  console.log('🔍 COMPREHENSIVE DEBUG INFO:')
+  console.log('import.meta.env.VITE_API_URL:', import.meta.env.VITE_API_URL)
+  console.log('typeof import.meta.env.VITE_API_URL:', typeof import.meta.env.VITE_API_URL)
+  console.log('API_BASE_URL length:', API_BASE_URL.length)
+  console.log('API_BASE_URL === "":', API_BASE_URL === '')
+  console.log('Sample API URL generation:')
+  console.log('  /api/hello ->', getApiUrl('/api/hello'))
+  console.log('  /api/predict ->', getApiUrl('/api/predict'))
+  console.log('Current window.location:', window.location.href)
+  console.log('All import.meta.env keys:', Object.keys(import.meta.env))
+  console.log('All import.meta.env values:', import.meta.env)
 
   // Fetch API message on component mount
   useEffect(() => {
@@ -151,6 +165,50 @@ function App() {
     }
   }
 
+  // Add a diagnostic function to test the API connection
+  const runDiagnostics = async () => {
+    console.log('🔍 RUNNING API DIAGNOSTICS...')
+    
+    // Test 1: Check what URL we're actually calling
+    const testUrl = getApiUrl('/api/health')
+    console.log('🔍 DIAGNOSTIC: Health check URL:', testUrl)
+    
+    try {
+      const response = await fetch(testUrl)
+      console.log('🔍 DIAGNOSTIC: Health check response status:', response.status)
+      console.log('🔍 DIAGNOSTIC: Health check response headers:', Object.fromEntries(response.headers.entries()))
+      
+      const text = await response.text()
+      console.log('🔍 DIAGNOSTIC: Health check response text:', text)
+      
+      // Try to parse as JSON
+      try {
+        const json = JSON.parse(text)
+        console.log('🔍 DIAGNOSTIC: Health check JSON:', json)
+      } catch (e) {
+        console.log('🔍 DIAGNOSTIC: Health check response is not JSON')
+      }
+    } catch (error) {
+      console.error('🔍 DIAGNOSTIC: Health check failed:', error)
+    }
+    
+    // Test 2: Check CORS preflight
+    console.log('🔍 DIAGNOSTIC: Testing CORS preflight...')
+    try {
+      const corsResponse = await fetch(testUrl, {
+        method: 'OPTIONS',
+        headers: {
+          'Access-Control-Request-Method': 'GET',
+          'Access-Control-Request-Headers': 'Content-Type',
+        }
+      })
+      console.log('🔍 DIAGNOSTIC: CORS preflight status:', corsResponse.status)
+      console.log('🔍 DIAGNOSTIC: CORS preflight headers:', Object.fromEntries(corsResponse.headers.entries()))
+    } catch (error) {
+      console.error('🔍 DIAGNOSTIC: CORS preflight failed:', error)
+    }
+  }
+
   return (
     <>
       <div>
@@ -169,9 +227,14 @@ function App() {
         {isLoading && <p>Loading...</p>}
         {error && <p style={{ color: 'red' }}>❌ {error}</p>}
         {apiMessage && <p style={{ color: 'green' }}>✅ {apiMessage}</p>}
-        <button onClick={fetchApiMessage} disabled={isLoading}>
-          Test API Connection
-        </button>
+        <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+          <button onClick={fetchApiMessage} disabled={isLoading}>
+            Test API Connection
+          </button>
+          <button onClick={runDiagnostics} disabled={isLoading}>
+            Run Diagnostics
+          </button>
+        </div>
       </div>
 
       {/* App Info */}
