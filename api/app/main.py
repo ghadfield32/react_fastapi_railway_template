@@ -15,6 +15,9 @@ from .crud import get_user_by_username
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Global readiness flag - set to True after database is initialized
+app_ready = False
+
 # Pydantic models
 class Payload(BaseModel):
     count: int
@@ -49,6 +52,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+async def startup_event():
+    """Set readiness flag after startup is complete."""
+    global app_ready
+    logger.info("🚀 FastAPI application startup complete")
+    logger.info(f"🏷  Runtime: Python {os.sys.version}")
+    logger.info(f"🌐 Port: {os.getenv('PORT', '8000')}")
+    logger.info(f"🔑 SECRET_KEY configured: {'Yes' if os.getenv('SECRET_KEY') else 'No (using generated key)'}")
+    app_ready = True
+
 @app.middleware("http")
 async def add_process_time_header(request: Request, call_next):
     """Measure request time and add X-Process-Time header."""
@@ -61,7 +74,21 @@ async def add_process_time_header(request: Request, call_next):
 @app.get("/health")
 async def root_health():
     """Root-level health check endpoint."""
-    return {"status": "healthy"}
+    return {
+        "status": "healthy",
+        "ready": app_ready,
+        "timestamp": time.time()
+    }
+
+@app.get("/api/health")
+async def api_health():
+    """API health check endpoint for Railway deployment."""
+    return {
+        "status": "healthy",
+        "ready": app_ready,
+        "timestamp": time.time(),
+        "service": "FastAPI + React Template"
+    }
 
 @app.get("/api/hello")
 async def hello(current_user: str = Depends(get_current_user)):
