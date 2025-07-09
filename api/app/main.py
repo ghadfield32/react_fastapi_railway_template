@@ -3,7 +3,9 @@ import os
 from fastapi import FastAPI, Request, Depends, BackgroundTasks, status, HTTPException
 from fastapi.security import OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.exc import SQLAlchemyError
 from pydantic import BaseModel
 import time
 
@@ -71,14 +73,30 @@ async def add_process_time_header(request: Request, call_next):
     response.headers["X-Process-Time"] = f"{elapsed:.4f}"
     return response
 
-@app.get("/health")
-async def root_health():
-    """Root-level health check endpoint."""
-    return {
-        "status": "healthy",
-        "ready": app_ready,
-        "timestamp": time.time()
-    }
+@app.get("/health", status_code=status.HTTP_200_OK)
+async def root_health(db: AsyncSession = Depends(get_db)):
+    """Liveness & readiness probe.
+
+    * ready=True  -> app & DB ok (200)
+    * ready=False -> still starting (503)
+    """
+    global app_ready
+    ready = app_ready
+    try:
+        # Cheap DB ping
+        await db.execute("SELECT 1")
+    except SQLAlchemyError:
+        ready = False
+
+    status_code = status.HTTP_200_OK if ready else status.HTTP_503_SERVICE_UNAVAILABLE
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "status": "healthy" if ready else "starting",
+            "ready": ready,
+            "timestamp": time.time(),
+        },
+    )
 
 @app.get("/api/health")
 async def api_health():
@@ -146,3 +164,4 @@ async def predict(
     )
 
     return PredictionResponse(**result) 
+
