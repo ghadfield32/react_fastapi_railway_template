@@ -1,40 +1,49 @@
 # api/app/security.py
+from __future__ import annotations
+import os, logging, secrets
 from datetime import datetime, timedelta
 from typing import Optional
-import os
+
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from jose import jwt, JWTError
 from passlib.context import CryptContext
-from jose import JWTError, jwt
 from pydantic import BaseModel
 
-# api/app/security.py  (replace the top-of-file guard)
+log = logging.getLogger(__name__)
+
+# ------------------------------------------------------------------
+# SECRET-KEY management
+# ------------------------------------------------------------------
 SECRET_KEY = os.getenv("SECRET_KEY")
-if not SECRET_KEY:                      # ← treat "" exactly like missing
-    raise RuntimeError(
-        "SECRET_KEY env var is required and must be non-empty. "
-        "Add one to .env or set it in production secrets store."
+
+if not SECRET_KEY:
+    # Generate an ephemeral key so the app stays up in non-production
+    SECRET_KEY = secrets.token_urlsafe(32)
+    log.warning(
+        "✅ Generated temporary SECRET_KEY. "
+        "Set a real value in Railway > Variables before going to production!"
     )
 
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Crypto helpers
+pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/token")
 
 class TokenData(BaseModel):
     username: Optional[str] = None
 
-def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+def verify_password(raw: str, hashed: str) -> bool:
+    return pwd_ctx.verify(raw, hashed)
 
-def get_password_hash(password: str) -> str:
-    return pwd_context.hash(password)
+def get_password_hash(pw: str) -> str:
+    return pwd_ctx.hash(pw)
 
 def create_access_token(subject: str) -> str:
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode = {"sub": subject, "exp": expire}
-    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    exp = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    return jwt.encode({"sub": subject, "exp": exp}, SECRET_KEY, algorithm=ALGORITHM)
 
 async def get_current_user(token: str = Depends(oauth2_scheme)) -> str:
     try:
@@ -43,5 +52,5 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> str:
         if not username:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
         return username
-    except JWTError:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+    except JWTError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED) from exc

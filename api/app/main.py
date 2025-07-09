@@ -37,16 +37,9 @@ app = FastAPI(
     lifespan=lifespan,  # register startup/shutdown events
 )
 
-# Configure CORS
-origins = [
-    "http://localhost:5173",  # Vite dev server
-    "http://localhost:3000",  # Alternative dev port
-]
-
-# Add production frontend URL if available
-frontend_url = os.getenv("FRONTEND_URL")
-if frontend_url:
-    origins.append(frontend_url)
+# Configure CORS with environment-based origins
+origins_env = os.getenv("ALLOWED_ORIGINS", "*")
+origins: list[str] = [o.strip() for o in origins_env.split(",")] if origins_env != "*" else ["*"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -65,9 +58,9 @@ async def add_process_time_header(request: Request, call_next):
     response.headers["X-Process-Time"] = f"{elapsed:.4f}"
     return response
 
-@app.get("/api/health")
-async def health_check():
-    """Unprotected health check endpoint."""
+@app.get("/health")
+async def root_health():
+    """Root-level health check endpoint."""
     return {"status": "healthy"}
 
 @app.get("/api/hello")
@@ -126,6 +119,3 @@ async def predict(
     )
 
     return PredictionResponse(**result) 
-
-
-
