@@ -1,40 +1,13 @@
 {
-  "name": "fastapi-react-railway",
-  "version": "1.0.0",
-  "description": "Full-stack FastAPI + React application for Railway deployment",
+  "name": "fastapi-react-monorepo",
   "private": true,
   "scripts": {
-    "dev": "npm-run-all --parallel dev:backend dev:frontend",
-    "dev:backend": "cd backend && set ENVIRONMENT=development && venv\\Scripts\\python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000",
-    "dev:frontend": "cd frontend && npm run dev",
-    "build": "cd frontend && npm run build",
-    "build:frontend": "cd frontend && npm run build",
-    "install:all": "npm install && cd frontend && npm install && cd .. && scripts\\setup-env.bat",
-    "install:frontend": "cd frontend && npm install",
-    "install:backend": "scripts\\setup-env.bat",
-    "test:api": "curl -f http://localhost:8000/api/health || echo 'Backend not running'",
-    "clean": "rm -rf frontend/dist frontend/node_modules backend/__pycache__ backend/app/__pycache__",
-    "docker:build": "docker build -t fastapi-react-app .",
-    "docker:run": "docker run -p 8000:8000 fastapi-react-app",
-    "railway:login": "railway login",
-    "railway:deploy": "railway up",
-    "railway:logs": "railway logs",
-    "railway:status": "railway status",
-    "test:railway": "scripts\\test-config-only.bat",
-    "pre-deploy": "scripts\\pre-deploy-check.bat",
-    "debug:railway": "scripts\\debug-railway-build.bat"
+    "install:all": "python -m venv .venv && .venv\\Scripts\\python.exe -m pip install uv && .venv\\Scripts\\uv.exe pip install -e api && .venv\\Scripts\\python.exe -m pip install bcrypt passlib[bcrypt] python-dotenv && (cd web && npm install)",
+    "seed": ".venv\\Scripts\\python.exe api/scripts/seed_user.py",
+    "dev": "concurrently -n \"API,WEB\" -c \"cyan,magenta\" \".venv\\Scripts\\python.exe -m uvicorn api.app.main:app --reload --env-file .env\" \"npm --prefix web run dev\"",
+    "debug": "timeout /T 3 && curl -s http://127.0.0.1:8000/api/health && echo. && curl -s -X POST -d \"username=alice&password=secret\" -H \"Content-Type: application/x-www-form-urlencoded\" http://127.0.0.1:8000/api/token"
   },
   "devDependencies": {
-    "npm-run-all": "^4.1.5"
-  },
-  "keywords": [
-    "fastapi",
-    "react",
-    "railway",
-    "fullstack",
-    "python",
-    "typescript"
-  ],
-  "author": "Your Name",
-  "license": "MIT"
+    "concurrently": "^8.2.2"
+  }
 } 
