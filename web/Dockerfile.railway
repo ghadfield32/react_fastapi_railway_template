@@ -12,11 +12,12 @@ FROM node:18-alpine AS build
 WORKDIR /app
 
 # Copy package files first (for better layer caching)
-COPY package*.json ./
+# We need both root and web package files for the monorepo structure
+COPY package.json package-lock.json ./
+COPY web/package.json web/package-lock.json ./web/
 
-# Install dependencies
-# We avoid mounting any caches under node_modules to prevent EBUSY errors
-RUN npm ci --prefer-offline --no-audit --loglevel=error
+# Install dependencies in web directory
+RUN cd web && npm ci --prefer-offline --no-audit --loglevel=error
 
 # Copy source code
 COPY . .
@@ -32,21 +33,21 @@ RUN echo "🔍 BUILD DEBUG: All ENV vars:" && env | grep -E "(VITE_|NODE_|RAILWA
 
 # Build the application with verbose output
 RUN echo "🔍 BUILD DEBUG: Starting build process..." && \
-    npm run build 2>&1 | tee build.log
+    cd web && npm run build 2>&1 | tee build.log
 
 # Debug: Check if the build contains the correct API URL
 RUN echo "🔍 BUILD DEBUG: Checking built files for API URL..." && \
-    find dist -name "*.js" -exec grep -l "fastapi-production-1d13.up.railway.app" {} \; || \
+    find web/dist -name "*.js" -exec grep -l "fastapi-production-1d13.up.railway.app" {} \; || \
     echo "🔍 BUILD DEBUG: API URL not found in built files"
 
 # Debug: Show actual content of built files (first 50 lines)
 RUN echo "🔍 BUILD DEBUG: Sample content from built JS files:" && \
-    find dist -name "*.js" | head -1 | xargs head -50 || \
+    find web/dist -name "*.js" | head -1 | xargs head -50 || \
     echo "🔍 BUILD DEBUG: No JS files found"
 
 # Debug: Search for any occurrence of 'VITE_API_URL' in built files
 RUN echo "🔍 BUILD DEBUG: Searching for VITE_API_URL in built files:" && \
-    find dist -name "*.js" -exec grep -H "VITE_API_URL" {} \; || \
+    find web/dist -name "*.js" -exec grep -H "VITE_API_URL" {} \; || \
     echo "🔍 BUILD DEBUG: VITE_API_URL not found in built files"
 
 # SERVE STAGE
@@ -58,7 +59,7 @@ WORKDIR /app
 RUN npm install -g serve
 
 # Copy only the built assets from build stage
-COPY --from=build /app/dist ./dist
+COPY --from=build /app/web/dist ./dist
 
 # Expose port
 EXPOSE $PORT
