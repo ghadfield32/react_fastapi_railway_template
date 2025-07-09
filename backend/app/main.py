@@ -153,7 +153,7 @@ async def predict(request: PredictionRequest):
         logger.info("🔍 DEBUG: Received prediction request")
         logger.info(f"🔍 DEBUG: Request data: {request.data}")
         logger.info(f"🔍 DEBUG: Request type: {type(request)}")
-        
+
         # Placeholder prediction logic
         # In a real app, you'd load your model and make predictions
         prediction_result = {
@@ -161,15 +161,15 @@ async def predict(request: PredictionRequest):
             "confidence": 0.95,
             "model_version": "v1.0.0"
         }
-        
+
         logger.info(f"🔍 DEBUG: Prediction result: {prediction_result}")
-        
+
         response = PredictionResponse(**prediction_result)
         logger.info(f"🔍 DEBUG: Response object: {response}")
         logger.info(f"🔍 DEBUG: Response dict: {response.dict()}")
-        
+
         return response
-    
+
     except Exception as e:
         logger.error(f"🔍 DEBUG: Exception in predict endpoint: {str(e)}")
         logger.error(f"🔍 DEBUG: Exception type: {type(e)}")
@@ -224,26 +224,26 @@ for path in possible_dist_paths:
 
 if frontend_build_path.exists():
     logger.info("🔍 DEBUG: === FRONTEND BUILD FOUND - SETTING UP STATIC FILES ===")
-    
+
     # Additional debug for static files
     dist_contents = list(frontend_build_path.iterdir())
     logger.info(f"🔍 DEBUG: Dist directory contents: {[str(p) for p in dist_contents]}")
-    
+
     # Check for index.html specifically
     index_file = frontend_build_path / "index.html"
     logger.info(f"🔍 DEBUG: Index.html exists: {index_file.exists()}")
-    
+
     # Check for assets directory
     assets_dir = frontend_build_path / "assets"
     logger.info(f"🔍 DEBUG: Assets directory exists: {assets_dir.exists()}")
     if assets_dir.exists():
         assets_contents = list(assets_dir.iterdir())
         logger.info(f"🔍 DEBUG: Assets directory contents: {[str(p) for p in assets_contents]}")
-    
+
     # Mount static files
     app.mount("/static", StaticFiles(directory="frontend/dist/assets"), name="static")
     logger.info("🔍 DEBUG: Static files mounted at /static")
-    
+
     # Serve React app for all other routes (SPA routing)
     @app.get("/{full_path:path}")
     async def serve_react_app(full_path: str):
@@ -252,12 +252,12 @@ if frontend_build_path.exists():
         This enables client-side routing
         """
         logger.info(f"🔍 DEBUG: Serving React app for path: {full_path}")
-        
+
         # Don't serve React app for API routes
         if full_path.startswith("api/"):
             logger.info(f"🔍 DEBUG: Rejecting API path: {full_path}")
             raise HTTPException(status_code=404, detail="API endpoint not found")
-        
+
         # Serve index.html for all other routes
         index_file = frontend_build_path / "index.html"
         if index_file.exists():
@@ -269,7 +269,7 @@ if frontend_build_path.exists():
 else:
     logger.warning("🔍 DEBUG: === FRONTEND BUILD NOT FOUND - USING JSON FALLBACK ===")
     logger.warning("Frontend build directory not found. React app will not be served.")
-    
+
     @app.get("/")
     async def root():
         """Root endpoint when frontend is not built"""
