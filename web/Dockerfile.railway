@@ -26,6 +26,7 @@ COPY package.json package-lock.json ./
 RUN echo "🔍 PACKAGE DEBUG: Package files after copy:" && ls -la package*
 RUN echo "🔍 PACKAGE DEBUG: Package.json content:" && head -20 package.json
 RUN echo "🔍 PACKAGE DEBUG: Package-lock.json exists:" && test -f package-lock.json && echo "YES" || echo "NO"
+RUN echo "🔍 PACKAGE DEBUG: Build script:" && cat package.json | grep -A 3 -B 3 '"build"'
 
 # Install dependencies
 RUN echo "🔍 INSTALL DEBUG: Starting npm ci..." && \
@@ -35,7 +36,7 @@ RUN echo "🔍 INSTALL DEBUG: Starting npm ci..." && \
 # Debug: Verify node_modules
 RUN echo "🔍 INSTALL DEBUG: Node modules created:" && ls -la node_modules | head -10
 RUN echo "🔍 INSTALL DEBUG: Key packages installed:" && \
-    ls node_modules/ | grep -E "(react|vite|rollup)" || echo "Key packages not found"
+    ls node_modules/ | grep -E "(react|vite|rollup|typescript)" || echo "Key packages not found"
 
 # Copy source code
 COPY . .
@@ -43,6 +44,7 @@ COPY . .
 # Debug: Show what files are available after source copy
 RUN echo "🔍 SOURCE DEBUG: All files after source copy:" && ls -la
 RUN echo "🔍 SOURCE DEBUG: Source directory structure:" && find . -type f -name "*.ts*" -o -name "*.js*" | head -20
+RUN echo "🔍 SOURCE DEBUG: TypeScript config files:" && ls -la tsconfig*
 
 # Build with environment variables
 # Railway provides these at build time, but we need to make sure they're available
@@ -53,14 +55,18 @@ ENV VITE_API_URL=$VITE_API_URL
 RUN echo "🔍 ENV DEBUG: VITE_API_URL = $VITE_API_URL"
 RUN echo "🔍 ENV DEBUG: All ENV vars:" && env | grep -E "(VITE_|NODE_|RAILWAY_)" || true
 
-# Build the application with verbose output
+# Pre-build TypeScript check (optional - will warn but not fail)
+RUN echo "🔍 TYPESCRIPT DEBUG: Running type check..." && \
+    npm run type-check || echo "⚠️  TypeScript check failed, but continuing with build..."
+
+# Build the application with verbose output and error handling
 RUN echo "🔍 BUILD DEBUG: Starting build process..." && \
     npm run build 2>&1 | tee build.log && \
     echo "🔍 BUILD DEBUG: Build completed successfully"
 
 # Debug: Verify build output
-RUN echo "🔍 BUILD DEBUG: Build output directory:" && ls -la dist/
-RUN echo "🔍 BUILD DEBUG: Built assets:" && find dist/ -type f | head -10
+RUN echo "🔍 BUILD DEBUG: Build output directory:" && ls -la dist/ || echo "❌ dist directory not found"
+RUN echo "🔍 BUILD DEBUG: Built assets:" && find dist/ -type f | head -10 || echo "❌ No files in dist"
 
 # Debug: Check if the build contains the correct API URL
 RUN echo "🔍 BUILD DEBUG: Checking built files for API URL..." && \
@@ -76,6 +82,9 @@ RUN echo "🔍 BUILD DEBUG: Sample content from built JS files:" && \
 RUN echo "🔍 BUILD DEBUG: Searching for VITE_API_URL in built files:" && \
     find dist -name "*.js" -exec grep -H "VITE_API_URL" {} \; || \
     echo "🔍 BUILD DEBUG: VITE_API_URL not found in built files"
+
+# Final verification that dist exists before proceeding
+RUN test -d dist || (echo "❌ FATAL: dist directory not created, build failed!" && exit 1)
 
 # SERVE STAGE
 FROM node:18-alpine
