@@ -68,10 +68,16 @@ export default defineConfig(({ mode }) => {
     define: {
       __API_URL__: JSON.stringify(API_URL)
     },
-    // Ensure TypeScript errors don't fail the build
+    // Ensure TypeScript errors don't fail the build in production
     esbuild: {
-      logOverride: { 'this-is-undefined-in-esm': 'silent' }
+      logOverride: { 
+        'this-is-undefined-in-esm': 'silent'
+      },
+      // Handle TypeScript errors more gracefully
+      target: 'es2020',
+      keepNames: true
     }
   }
 })
+
 

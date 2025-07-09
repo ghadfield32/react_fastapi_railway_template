@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "tsc -b --noEmit && vite build",
+    "build:force": "vite build",
     "type-check": "tsc -p tsconfig.app.json --noEmit",
+    "type-check:verbose": "tsc -p tsconfig.app.json --noEmit --listFiles",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -37,4 +39,5 @@
     "@rollup/rollup-win32-x64-msvc": "^4.16.0"
   }
 }
+
 
