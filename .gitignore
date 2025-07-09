@@ -14,7 +14,7 @@ archive/
 uv.lock
 
 test_iris.json
-.env.template
+#.env.template
 
 # Railway CLI (never commit tokens)
 .railway/config.json
