@@ -4,6 +4,7 @@
 # - Uses explicit cache paths to avoid conflicts with Railway's build system
 # - Implements multi-stage build for better layer caching
 # - Separates dependency installation from build for better caching
+# - Works from web directory context (Railway builds from web/)
 
 # BUILD STAGE
 FROM node:18-alpine AS build
@@ -11,16 +12,37 @@ FROM node:18-alpine AS build
 # Set working directory
 WORKDIR /app
 
-# Copy package files first (for better layer caching)
-# We need both root and web package files for the monorepo structure
-COPY package.json package-lock.json ./
-COPY web/package.json web/package-lock.json ./web/
+# Debug: Show initial environment
+RUN echo "🔍 INITIAL DEBUG: Node version:" && node --version
+RUN echo "🔍 INITIAL DEBUG: NPM version:" && npm --version
+RUN echo "🔍 INITIAL DEBUG: Working directory:" && pwd
+RUN echo "🔍 INITIAL DEBUG: Available files:" && ls -la
 
-# Install dependencies in web directory
-RUN cd web && npm ci --prefer-offline --no-audit --loglevel=error
+# Copy package files first (for better layer caching)
+# Since Railway builds from web/ context, we copy the local package files
+COPY package.json package-lock.json ./
+
+# Debug: Verify package files are copied
+RUN echo "🔍 PACKAGE DEBUG: Package files after copy:" && ls -la package*
+RUN echo "🔍 PACKAGE DEBUG: Package.json content:" && head -20 package.json
+RUN echo "🔍 PACKAGE DEBUG: Package-lock.json exists:" && test -f package-lock.json && echo "YES" || echo "NO"
+
+# Install dependencies
+RUN echo "🔍 INSTALL DEBUG: Starting npm ci..." && \
+    npm ci --prefer-offline --no-audit --loglevel=error && \
+    echo "🔍 INSTALL DEBUG: npm ci completed successfully"
+
+# Debug: Verify node_modules
+RUN echo "🔍 INSTALL DEBUG: Node modules created:" && ls -la node_modules | head -10
+RUN echo "🔍 INSTALL DEBUG: Key packages installed:" && \
+    ls node_modules/ | grep -E "(react|vite|rollup)" || echo "Key packages not found"
 
 # Copy source code
 COPY . .
+
+# Debug: Show what files are available after source copy
+RUN echo "🔍 SOURCE DEBUG: All files after source copy:" && ls -la
+RUN echo "🔍 SOURCE DEBUG: Source directory structure:" && find . -type f -name "*.ts*" -o -name "*.js*" | head -20
 
 # Build with environment variables
 # Railway provides these at build time, but we need to make sure they're available
@@ -28,26 +50,31 @@ ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
 
 # Debug: Show what environment variables are available during build
-RUN echo "🔍 BUILD DEBUG: VITE_API_URL = $VITE_API_URL"
-RUN echo "🔍 BUILD DEBUG: All ENV vars:" && env | grep -E "(VITE_|NODE_|RAILWAY_)" || true
+RUN echo "🔍 ENV DEBUG: VITE_API_URL = $VITE_API_URL"
+RUN echo "🔍 ENV DEBUG: All ENV vars:" && env | grep -E "(VITE_|NODE_|RAILWAY_)" || true
 
 # Build the application with verbose output
 RUN echo "🔍 BUILD DEBUG: Starting build process..." && \
-    cd web && npm run build 2>&1 | tee build.log
+    npm run build 2>&1 | tee build.log && \
+    echo "🔍 BUILD DEBUG: Build completed successfully"
+
+# Debug: Verify build output
+RUN echo "🔍 BUILD DEBUG: Build output directory:" && ls -la dist/
+RUN echo "🔍 BUILD DEBUG: Built assets:" && find dist/ -type f | head -10
 
 # Debug: Check if the build contains the correct API URL
 RUN echo "🔍 BUILD DEBUG: Checking built files for API URL..." && \
-    find web/dist -name "*.js" -exec grep -l "fastapi-production-1d13.up.railway.app" {} \; || \
+    find dist -name "*.js" -exec grep -l "fastapi-production-1d13.up.railway.app" {} \; || \
     echo "🔍 BUILD DEBUG: API URL not found in built files"
 
 # Debug: Show actual content of built files (first 50 lines)
 RUN echo "🔍 BUILD DEBUG: Sample content from built JS files:" && \
-    find web/dist -name "*.js" | head -1 | xargs head -50 || \
+    find dist -name "*.js" | head -1 | xargs head -50 || \
     echo "🔍 BUILD DEBUG: No JS files found"
 
 # Debug: Search for any occurrence of 'VITE_API_URL' in built files
 RUN echo "🔍 BUILD DEBUG: Searching for VITE_API_URL in built files:" && \
-    find web/dist -name "*.js" -exec grep -H "VITE_API_URL" {} \; || \
+    find dist -name "*.js" -exec grep -H "VITE_API_URL" {} \; || \
     echo "🔍 BUILD DEBUG: VITE_API_URL not found in built files"
 
 # SERVE STAGE
@@ -55,14 +82,24 @@ FROM node:18-alpine
 
 WORKDIR /app
 
+# Debug: Show serve stage environment
+RUN echo "🔍 SERVE DEBUG: Node version in serve stage:" && node --version
+
 # Install serve globally
 RUN npm install -g serve
 
 # Copy only the built assets from build stage
-COPY --from=build /app/web/dist ./dist
+COPY --from=build /app/dist ./dist
+
+# Debug: Verify dist files are copied
+RUN echo "🔍 SERVE DEBUG: Dist files copied:" && ls -la dist/
+RUN echo "🔍 SERVE DEBUG: Total files in dist:" && find dist/ -type f | wc -l
 
 # Expose port
 EXPOSE $PORT
 
+# Debug: Show final environment before starting
+RUN echo "🔍 SERVE DEBUG: Final environment:" && env | grep -E "(PORT|NODE_)" || true
+
 # Start the application
-CMD ["sh", "-c", "serve -s dist -l $PORT --no-clipboard --no-port-switching"] 
+CMD ["sh", "-c", "echo '🔍 SERVE DEBUG: Starting server on port $PORT' && serve -s dist -l $PORT --no-clipboard --no-port-switching"] 
