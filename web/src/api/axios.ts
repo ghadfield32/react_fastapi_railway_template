@@ -1,4 +1,4 @@
-import axios, { InternalAxiosRequestConfig } from 'axios';
+import axios, { InternalAxiosRequestConfig, AxiosError } from 'axios';
 import { getStoredToken } from '../contexts/AuthContext';
 
 declare const __API_URL__: string;  // Declare the injected constant
@@ -12,4 +12,22 @@ api.interceptors.request.use((cfg: InternalAxiosRequestConfig) => {
   if (t) cfg.headers.Authorization = `Bearer ${t}`;
   return cfg;
 }); 
+
+/* ---------- global 401 handler --------------- */
+api.interceptors.response.use(
+  response => response,
+  (error: AxiosError) => {
+    const status = error.response?.status;
+    if (status === 401) {
+      // Clear the invalid token
+      localStorage.removeItem('jwt');
+      // Show friendly message to user
+      alert(
+        'Your session expired (401). Please log out and log back in so a new token can be issued.'
+      );
+      // Note: Optionally force refresh with: window.location.reload();
+    }
+    return Promise.reject(error);
+  }
+); 
 

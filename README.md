@@ -1,124 +1,135 @@
-# FastAPI React Template
+# FastAPI + React • Railway-ready Template
 
-A template for building full-stack applications with FastAPI and React.
+This repo contains a FastAPI back-end (`/api`) and a React (Vite) front-end (`/web`).  
+Follow the steps below to run everything locally with **Railway CLI** and then deploy the two services on railway.com.
 
-## Prerequisites
+---
 
-- Python 3.8 or higher
-- Node.js 18 or higher
-- npm 9 or higher
+## 1 · Clone the template
 
-## Quick Start
+```bash
+git clone <repository-url>
+cd <repository-name>
+````
 
-1. Clone the repository:
-   ```bash
-   git clone <repository-url>
-   cd <repository-name>
-   ```
+---
 
-2. Create a `.env` file in the root directory with:
-   ```
-   SECRET_KEY=dev-secret-key-here
-   DATABASE_URL=sqlite+aiosqlite:///./app.db
-   VITE_API_URL=http://localhost:8000
-   ```
+## 2 · Install & link Railway CLI
 
-3. Install dependencies and set up the development environment:
-   ```bash
-   npm run install:all
-   ```
-
-4. Create the database and seed the test user:
-   ```bash
-   npm run seed
-   ```
-
-5. Start the development servers:
-   ```bash
-   npm run dev
-   ```
-
-The application will be available at:
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:8000
-- API Documentation: http://localhost:8000/docs
-
-## Test User Credentials
-
-- Username: alice
-- Password: secret
-
-## Available Scripts
-
-- `npm run install:all` - Install all dependencies (Python and Node.js)
-- `npm run seed` - Create database and seed test user
-- `npm run dev` - Start development servers (API + Web)
-- `npm run debug` - Run basic health check and authentication test
-
-## Project Structure
-
-- `/api` - FastAPI backend
-  - `/app` - Application code
-    - `main.py` - Main application entry point
-    - `models.py` - Database models
-    - `security.py` - Authentication and security
-    - `db.py` - Database configuration
-- `/web` - React frontend
-  - `/src` - Source code
-    - `/api` - API client configuration
-    - `/contexts` - React contexts
-    - `/pages` - React components/pages
-
-## Development
-
-The development servers support hot reloading:
-- FastAPI server will reload on Python file changes
-- Vite dev server will reload on React/TypeScript file changes
-
-## Environment Variables
-
-### Backend (FastAPI)
-- `SECRET_KEY` - JWT signing key
-- `DATABASE_URL` - SQLite database URL
-
-### Frontend (Vite/React)
-- `VITE_API_URL` - Backend API URL 
-
-
-
-## Railway CLI Information:
-## Set up your project locally
-
-1. Install the Railway CLI
-```
-curl -fsSL https://railway.com/install.sh | sh
+```bash
+curl -fsSL https://railway.com/install.sh | sh   # one-liner for macOS, Linux, WSL
+railway login                                    # opens browser once
+railway init -p <optional-existing-project-id>   # creates or links a project
 ```
 
-2. Connect to this project
-```
-railway link -p fc9da558-31d6-4b28-9eda-2bbe56cc7390
-```
-Project not found? Run railway login
+---
 
-All done! Once your app is ready use
-```
-railway up
-```
-to deploy.
+## 3 · Create your `.env` from the template
 
-
-
-# testing locally in railway cli:
-backend:
+```bash
+cp .env.template .env
+nano .env         # or code .env / vim .env
 ```
+
+| Key            | Sample value                   | Note                      |
+| -------------- | ------------------------------ | ------------------------- |
+| `SECRET_KEY`   | `super-secret-change-me`       | JWT signing key (backend) |
+| `DATABASE_URL` | `sqlite+aiosqlite:///./app.db` | or Postgres URI           |
+| `VITE_API_URL` | `http://localhost:8000`        | front-end → back-end URL  |
+
+---
+
+## 4 · Install all local deps (one command)
+
+```bash
+npm run install:all     # sets up Python venv, uv, and Node modules
+```
+
+---
+
+## 5 · Smoke-test locally *via Railway CLI*
+
+```bash
+# back-end
 cd api
 railway run uvicorn app.main:app --reload
-# run seed:
+# (new terminal) seed the DB
 railway run python -m scripts.seed_user
-```
-
-frontend:
-```
-cd web
+# front-end
+cd ../web
 railway run npm run dev
 ```
+
+* Front-end → [http://localhost:5173](http://localhost:5173)
+* API → [http://localhost:8000/docs](http://localhost:8000/docs)
+
+The `railway run` wrapper injects your `.env` so you’re testing exactly what will run in the cloud.
+
+---
+
+## 6 · Prepare the repo for Railway
+
+1. **Commit and push** everything to GitHub.
+
+2. In the Railway dashboard create **two services** in the same project:
+
+   | Service | Root directory (Settings → Root) |
+   | ------- | -------------------------------- |
+   | `api`   | `api`                            |
+   | `web`   | `web`                            |
+
+   (Root directories ensure each build only pulls the code it needs.)
+
+3. **Copy env vars**
+
+   * Open each service → Variables → “New Variable from File” → upload **.env**.
+   * Delete `VITE_API_URL` from the `api` service and `SECRET_KEY`, `DATABASE_URL` from the `web` service so each side only keeps what it uses.
+
+4. **Click Deploy** (or just push more commits; Railway auto-deploys).
+
+---
+
+## 7 · Verify production URLs
+
+After the first deploy, Railway shows a unique domain for each service:
+
+```text
+https://api--<random>.up.railway.app
+https://web--<random>.up.railway.app
+```
+
+Update **`VITE_API_URL`** in the *web* service variables to the API’s final URL, redeploy the web service, and you’re done.
+
+---
+
+### Recap — three-command workflow after the first push
+
+```bash
+# make changes …
+git add .
+git commit -m "feat: awesome change"
+git push            # triggers two Railway builds
+```
+
+---
+
+## Troubleshooting
+
+* **401 token expired** – Refresh the token in `localStorage` or simply log out / back in; your FastAPI handler will now return a helpful hint.
+* **Wrong root** – If the build log tries to install both back-end and front-end deps, re-check the “Root directory” for that service.
+* **Need Docker instead of Nixpacks?** – Drop a `Dockerfile` in `api/` or `web/` and Railway will automatically build from it.
+
+Happy shipping! 🚂
+
+```
+
+---
+
+### Why these steps work
+
+* **Railway CLI**: provides `init`, `link`, `run`, and `variables` for local parity and CI scripting. :contentReference[oaicite:1]{index=1}  
+* **Environment variables**: `railway run` loads envs exactly as deployed, and `railway variables` lets you sync `.env` with the remote service store. :contentReference[oaicite:2]{index=2}  
+* **Monorepo root directories**: setting the root prevents unnecessary installs and speeds builds. :contentReference[oaicite:3]{index=3}  
+* **Nixpacks vs. Dockerfile**: Railway defaults to Nixpacks but switches automatically when it detects a `Dockerfile`. :contentReference[oaicite:4]{index=4}  
+* **FastAPI/React precedent**: countless community templates follow the same flow (clone → env → commit → Railway). :contentReference[oaicite:5]{index=5}
+::contentReference[oaicite:6]{index=6}
