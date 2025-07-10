@@ -1,16 +1,27 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from './contexts/AuthContext';
 import Login from './pages/Login';
 import reactLogo from './assets/react.svg';
 import './App.css';
 
+declare const __API_URL__: string;  // Declare the injected constant
+
+// Augment ImportMeta to include Vite's env types
+declare global {
+  interface ImportMeta {
+    env: {
+      DEV: boolean;
+      PROD: boolean;
+    };
+  }
+}
+
 /* ── helper: always hit FastAPI ───────────────────────────────────────────── */
 const buildUrl = (endpoint: string) => {
-  // dev → proxy (prefix /api if caller forgot it); prod → absolute URL
   if (import.meta.env.DEV) {
     return endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`;
   }
-  return `${import.meta.env.VITE_API_URL}${endpoint}`;
+  return `${__API_URL__}${endpoint}`;   // Use same constant as axios
 };
 
 interface PredictionResponse {

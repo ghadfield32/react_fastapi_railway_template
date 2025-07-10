@@ -1,35 +1,15 @@
-import axios, { InternalAxiosRequestConfig, AxiosHeaders } from 'axios';
+import axios, { InternalAxiosRequestConfig } from 'axios';
 import { getStoredToken } from '../contexts/AuthContext';
 
-// Augment ImportMeta to include Vite's env types
-declare global {
-  interface ImportMeta {
-    env: {
-      DEV: boolean;
-      PROD: boolean;
-      VITE_API_URL: string;
-    };
-  }
-}
+declare const __API_URL__: string;  // Declare the injected constant
 
-/**
- * Get the normalized API root URL from Vite's environment.
- * This is guaranteed to be a valid absolute URL by vite.config.ts
- */
-const root = import.meta.env.VITE_API_URL.replace(/\/+$/, '');
+const root = __API_URL__;              // Now guaranteed absolute
 export const api = axios.create({ baseURL: `${root}/api` });
 
 api.interceptors.request.use((cfg: InternalAxiosRequestConfig) => {
   const t = getStoredToken();
-  if (t) {
-    if (!cfg.headers) cfg.headers = new AxiosHeaders();
-    cfg.headers.Authorization = `Bearer ${t}`;
-  }
+  cfg.headers = cfg.headers || {};
+  if (t) cfg.headers.Authorization = `Bearer ${t}`;
   return cfg;
 }); 
-
-
-
-
-
 

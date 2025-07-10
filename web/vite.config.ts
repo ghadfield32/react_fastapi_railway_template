@@ -14,7 +14,7 @@ export default defineConfig(({ mode }) => {
 
   // Final sanity-check – bail if still invalid
   if (!/^https?:\/\/[^/]+$/.test(API_URL)) {
-    throw new Error(`VITE_API_URL must be an absolute URL (got "${API_URL}").`)
+    throw new Error(`VITE_API_URL must be an absolute URL – got "${API_URL}"`);
   }
 
   console.log('🔍 Vite Config Debug:')
@@ -25,7 +25,11 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
-    define: { __API_URL__: JSON.stringify(API_URL) },
+    /** Inject BOTH names so legacy code keeps working */
+    define: {
+      __API_URL__: JSON.stringify(API_URL),
+      'import.meta.env.VITE_API_URL': JSON.stringify(API_URL)
+    },
     server: {
       host: '0.0.0.0',
       port: 5173,
@@ -71,7 +75,3 @@ export default defineConfig(({ mode }) => {
     }
   }
 })
-
-
-
-
