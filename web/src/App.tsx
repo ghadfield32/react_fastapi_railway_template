@@ -1,44 +1,53 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from './contexts/AuthContext';
 import Login from './pages/Login';
+// @ts-ignore
 import reactLogo from './assets/react.svg';
 import './App.css';
 
-declare const __API_URL__: string;  // Declare the injected constant
-
-// Augment ImportMeta to include Vite's env types
-declare global {
-  interface ImportMeta {
-    env: {
-      DEV: boolean;
-      PROD: boolean;
-    };
-  }
+interface ImportMetaEnv {
+  readonly DEV: boolean;
+  readonly PROD: boolean;
 }
 
-/* ── helper: always hit FastAPI ───────────────────────────────────────────── */
-const buildUrl = (endpoint: string) => {
-  if (import.meta.env.DEV) {
-    return endpoint.startsWith('/api') ? endpoint : `/api${endpoint}`;
-  }
-  return `${__API_URL__}${endpoint}`;   // Use same constant as axios
-};
+interface ImportMeta {
+  readonly env: ImportMetaEnv;
+}
+
+declare const __API_URL__: string;
+const buildUrl = (e: string) => import.meta.env.DEV ? (e.startsWith('/api') ? e : `/api${e}`) : `${__API_URL__}${e}`;
 
 interface PredictionResponse {
   prediction: string;
   confidence: number;
-  input_received: {
-    count: number;
-  };
+  input_received: { count: number };
 }
 
 export default function App() {
-  const { token, logout } = useAuth();
+  const { token, verified, markVerified, invalidate, logout } = useAuth();
   const [count, setCount] = useState(0);
   const [apiMessage, setApiMessage] = useState('');
   const [error, setError] = useState('');
   const [prediction, setPrediction] = useState<PredictionResponse | null>(null);
 
+  /* ---- validate stored JWT once on mount --------------------------------- */
+  useEffect(() => {
+    if (!token || verified) return;                 // nothing to do
+    (async () => {
+      try {
+        const res = await fetch(buildUrl('/api/hello'), {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) throw new Error('token invalid');
+        markVerified();
+      } catch {
+        invalidate();                               // wipes bad token
+      }
+    })();
+  }, [token, verified, markVerified, invalidate]);
+
+  /* ---- helper to call JSON endpoints ------------------------------------- */
   const fetchJson = async <T,>(endpoint: string, init?: RequestInit): Promise<T> => {
     const headers = new Headers(init?.headers);
     headers.set('Content-Type', 'application/json');
@@ -48,21 +57,22 @@ export default function App() {
     return res.json() as Promise<T>;
   };
 
-  /* ── after login, load greeting ─────────────────────────────────────────── */
+  /* ---- grab greeting after verification ---------------------------------- */
   useEffect(() => {
-    if (!token) return;
+    if (!verified) return;
     fetchJson<{ message: string }>('/api/hello')
       .then(({ message }) => setApiMessage(message))
-      .catch((err) => setError(err.message));
-  }, [token]);
+      .catch(err => setError(err.message));
+  }, [verified]);
 
-  if (!token) return <Login />;
+  /* ---- RENDER ------------------------------------------------------------ */
+  if (!token || !verified) return <Login />;   // ← always initial view
 
   return (
     <>
       <div>
         <img src="/vite.svg" className="logo" alt="Vite logo" />
-        <a href="https://react.dev" target="_blank">
+        <a href="https://react.dev" target="_blank" rel="noreferrer">
           <img src={reactLogo} className="logo react" alt="React logo" />
         </a>
       </div>
@@ -75,18 +85,18 @@ export default function App() {
         {apiMessage && <p style={{ color: 'green' }}>✅ {apiMessage}</p>}
 
         <button onClick={logout}>Logout</button>
-        <button onClick={() => setCount((c) => c + 1)}>Count {count}</button>
+        <button onClick={() => setCount(c => c + 1)}>Count {count}</button>
         <button
           onClick={() =>
             fetchJson<PredictionResponse>('/api/predict', {
               method: 'POST',
-              body: JSON.stringify({ data: { count } })
+              body: JSON.stringify({ data: { count } }),
             })
-              .then((r) => {
+              .then(r => {
                 setPrediction(r);
                 setError('');
               })
-              .catch((e) => {
+              .catch(e => {
                 setError(e.message);
                 setPrediction(null);
               })
@@ -107,3 +117,4 @@ export default function App() {
     </>
   );
 }
+

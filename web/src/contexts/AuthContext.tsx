@@ -1,38 +1,50 @@
-import { createContext, useContext, useState, ReactNode } from 'react'
+import React from 'react';
+import { createContext, useContext, useState, ReactNode } from 'react';
 
 interface AuthCtx {
-  token: string | null
-  login: (t: string) => void
-  logout: () => void
+  token: string | null;
+  verified: boolean;
+  login: (t: string) => void;
+  logout: () => void;
+  markVerified: () => void;
+  invalidate: () => void;
 }
 
-const Ctx = createContext<AuthCtx | undefined>(undefined)
+const Ctx = createContext<AuthCtx | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [token, setToken] = useState<string | null>(() => {
-    // Initialize from localStorage on mount
-    return localStorage.getItem('jwt')
-  })
+  const [token, setToken] = useState<string | null>(() => localStorage.getItem('jwt'));
+  const [verified, setVerified] = useState(false);
 
   const login = (t: string) => {
-    setToken(t)
-    localStorage.setItem('jwt', t)
-  }
+    setToken(t);
+    setVerified(false);              // must re-check with server
+    localStorage.setItem('jwt', t);
+  };
 
   const logout = () => {
-    setToken(null)
-    localStorage.removeItem('jwt')
-  }
+    setToken(null);
+    setVerified(false);
+    localStorage.removeItem('jwt');
+  };
 
-  return <Ctx.Provider value={{ token, login, logout }}>{children}</Ctx.Provider>
-}
+  const markVerified = () => setVerified(true);
+  const invalidate   = () => logout();
+
+  return (
+    <Ctx.Provider value={{ token, verified, login, logout, markVerified, invalidate }}>
+      {children}
+    </Ctx.Provider>
+  );
+};
 
 export const useAuth = () => {
-  const ctx = useContext(Ctx)
-  if (!ctx) throw new Error('useAuth must be inside AuthProvider')
-  return ctx
-}
+  const ctx = useContext(Ctx);
+  if (!ctx) throw new Error('useAuth must be inside AuthProvider');
+  return ctx;
+};
 
-// Simple helper for axios interceptor - no hooks!
-export const getStoredToken = () => localStorage.getItem('jwt') 
+// No hooks – safe for axios interceptor
+export const getStoredToken = () => localStorage.getItem('jwt'); 
+
 
