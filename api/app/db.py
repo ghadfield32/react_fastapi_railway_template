@@ -1,42 +1,43 @@
 # api/app/db.py
 from contextlib import asynccontextmanager
-import os
-import logging
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
+import os, logging
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    create_async_engine,
+    async_sessionmaker,
+)
 from .models import Base
 
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Database engine & session factory (module-level singletons – cheap & safe)
+# ---------------------------------------------------------------------------
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./app.db")
-
 engine = create_async_engine(DATABASE_URL, echo=False, future=True)
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
 
+# ---------------------------------------------------------------------------
+# FastAPI lifespan – runs ONCE at startup / shutdown
+# ---------------------------------------------------------------------------
 @asynccontextmanager
 async def lifespan(app):
-    """Open & dispose engine on startup/shutdown."""
-    logger.info("🗄️  Initializing database...")
-    logger.info(f"🔗 Database URL: {DATABASE_URL}")
-
+    """Open & dispose engine at app startup/shutdown; create all tables."""
+    logger.info("🗄️  Initializing database…  URL=%s", DATABASE_URL)
     try:
         async with engine.begin() as conn:
+            # DDL is safe here; it blocks startup until complete
             await conn.run_sync(Base.metadata.create_all)
         logger.info("✅ Database tables created/verified successfully")
-    except Exception as e:
-        logger.error(f"❌ Database initialization failed: {e}")
-        raise
+        yield
+    finally:
+        logger.info("🔒 Disposing database engine…")
+        await engine.dispose()
 
-    yield
-
-    logger.info("🔒 Disposing database engine...")
-    await engine.dispose()
-
+# ---------------------------------------------------------------------------
+# Dependency injection helper
+# ---------------------------------------------------------------------------
 async def get_db() -> AsyncSession:
-    """Yield a new DB session for each request."""
+    """Yield a new DB session per request."""
     async with AsyncSessionLocal() as session:
         yield session
-
-async with engine.begin() as conn:
-    await conn.run_sync(Base.metadata.create_all)
-logger.info("✅ Database ready")      # <-- keeps the probe very chatty
-

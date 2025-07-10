@@ -105,3 +105,20 @@ All done! Once your app is ready use
 railway up
 ```
 to deploy.
+
+
+
+# testing locally in railway cli:
+backend:
+```
+cd api
+railway run uvicorn app.main:app --reload
+# run seed:
+railway run python -m scripts.seed_user
+```
+
+frontend:
+```
+cd web
+railway run npm run dev
+```
