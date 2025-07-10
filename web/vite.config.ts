@@ -13,6 +13,13 @@ export default defineConfig(({ mode }) => {
       ? 'https://fastapi-production-1d13.up.railway.app' 
       : 'http://127.0.0.1:8000')
 
+  // Validate API URL in production to catch configuration errors early
+  if (mode === 'production' && !/^https?:\/\//.test(API_URL)) {
+    throw new Error(
+      `VITE_API_URL must include http(s):// and point at the backend – got "${API_URL}".`
+    );
+  }
+
   console.log('🔍 Vite Config Debug:')
   console.log('Mode:', mode)
   console.log('API_URL:', API_URL)
@@ -79,5 +86,6 @@ export default defineConfig(({ mode }) => {
     }
   }
 })
+
 
 
