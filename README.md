@@ -83,3 +83,25 @@ The development servers support hot reloading:
 
 ### Frontend (Vite/React)
 - `VITE_API_URL` - Backend API URL 
+
+
+
+## Railway CLI Information:
+## Set up your project locally
+
+1. Install the Railway CLI
+```
+curl -fsSL https://railway.com/install.sh | sh
+```
+
+2. Connect to this project
+```
+railway link -p fc9da558-31d6-4b28-9eda-2bbe56cc7390
+```
+Project not found? Run railway login
+
+All done! Once your app is ready use
+```
+railway up
+```
+to deploy.

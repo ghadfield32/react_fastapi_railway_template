@@ -1,0 +1,195 @@
+Railway works best when you treat each part of your monorepo as its own **service** and let the CLI keep those services in sync while you develop.
+Below is a battle-tested workflow that:
+
+* keeps **/api** (FastAPI) and **/web** (React + Vite) totally independent,
+* lets you run both locally with **Railway env-vars** injected, and
+* deploys the same code paths to production with a single `railway up`.
+
+---
+
+## 1  Repository & Service Layout
+
+```
+react_fastapi_railway_template/
+├─ .railway/            # created by `railway link`; never commit tokens
+├─ api/                 # FastAPI back-end
+│  └─ railway.json      # Builder: Nixpacks + start.sh health-checked
+├─ web/                 # React front-end
+│  └─ railway.json      # Builder: Dockerfile.railway → nginx
+└─ README.md            # local dev & CLI docs
+```
+
+* **One project → two services** is Railway’s recommended pattern for monorepos ([Railway Help Station][1], [Railway Blog][2]).
+* Each folder owns its **own** `railway.json`; config-as-code always overrides UI settings ([Railway Docs][3], [Railway Docs][4]).
+* When Railway builds your repo it **only looks inside the service folder** for a `railway.json`, so duplicate names are fine ([Railway Help Station][5], [Railway Docs][6]).
+
+---
+
+## 2  One-Time CLI Bootstrapping
+
+```bash
+# root of the repo
+railway link -p fc9da558-31d6-4b28-9eda-2bbe56cc7390   # associates .railway
+
+# create & link the API service
+cd api
+railway service create api        # one-off, or via UI
+railway service                   # writes .railway/service
+
+# create & link the WEB service
+cd ../web
+railway service create web
+railway service
+```
+
+* `railway service` pins the current directory to the chosen service ([Railway Docs][7]).
+* Confirm with `railway status` from either folder (it prints the linked service) ([Railway Docs][7]).
+
+---
+
+## 3  Environment Variables
+
+1. Add shared secrets (e.g. `SECRET_KEY`, `DATABASE_URL`) in the **project-level** Variables tab;
+2. Add `VITE_API_URL` only on the **web** service;
+3. Sync them locally:
+
+```bash
+railway variables pull --env production --file .env         # root file
+```
+
+Variables pulled this way are exported automatically by `railway run` and `railway shell` ([Railway Docs][8], [Railway Docs][8]).
+
+---
+
+## 4  Local Development Loop
+
+### 4.1 Start services with Railway vars
+
+```bash
+# terminal-1: API
+cd api
+railway run uvicorn app.main:app --reload --port 8000
+
+# terminal-2: Web
+cd ../web
+railway run npm run dev          # vite runs on :5173
+```
+
+`railway run` injects *exactly* the same vars you’ll get in production ([Railway Docs][7]).
+
+### 4.2 Smoke-test in another shell
+
+```bash
+# health probes
+curl http://localhost:8000/health
+curl http://localhost:5173/health       # served by nginx conf locally
+
+# auth + prediction
+curl -XPOST -d "username=alice&password=secret" \
+     -H "Content-Type: application/x-www-form-urlencoded" \
+     http://localhost:8000/api/token | jq .
+TOKEN=...
+
+curl -H "Authorization: Bearer $TOKEN" \
+     -d '{"data":{"count":42}}' \
+     -H "Content-Type: application/json" \
+     http://localhost:8000/api/predict | jq .
+```
+
+### 4.3 One-shell variant
+
+If you prefer one pane, run:
+
+```bash
+railway shell
+# inside that shell (all Railway vars loaded):
+invoke dev     # your invoke.yml starts both via concurrently
+```
+
+`railway shell` opens an interactive subshell with the environment pre-set ([Railway Docs][7]).
+
+---
+
+## 5  Deploy & Validate from CLI
+
+```bash
+# API
+cd api
+railway up --service api --detach      # returns immediately
+railway logs                           # follow build + runtime logs
+
+# WEB
+cd ../web
+railway up --service web --detach
+railway logs
+```
+
+* Passing `--service` keeps the CLI from prompting in CI ([Railway Help Station][9]).
+* Health checks (`/health`) defined in each `railway.json` gate the “✔ Healthy” status you see in the dashboard ([Railway Help Station][10]).
+
+---
+
+## 6  GitHub → Railway CI Pipeline
+
+```yaml
+# .github/workflows/railway.yml
+name: Deploy to Railway
+on: [push]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - run: npm i -g @railway/cli           # CLI install
+      # link once per checkout
+      - run: railway link -p ${{ secrets.RAILWAY_PROJECT_ID }}
+        env: { RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }} }
+      # deploy API
+      - run: railway up --service api --detach
+        env: { RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_API }} }
+      # deploy WEB
+      - run: railway up --service web --detach
+        env: { RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN_WEB }} }
+```
+
+* **Account token** (`RAILWAY_API_TOKEN`) is required for `link`;
+* **Project tokens** can be scoped per service for the `up` step ([Railway Docs][7], [Railway Docs][11]).
+
+---
+
+## 7  Production Readiness Tips
+
+| Check                                 | Why it matters                                                      |
+| ------------------------------------- | ------------------------------------------------------------------- |
+| **Config-as-code** only (no UI drift) | Keeps infra reproducible ([Railway Docs][12])                       |
+| **Dockerfile path in `railway.json`** | No confusion over multiple Dockerfiles ([Railway Docs][11])         |
+| **Separate healthchecks** per service | Faster rollbacks & clear logs ([Railway Help Station][10])          |
+| **`railway logs` + Log Explorer**     | Cross-service debugging ([Railway Docs][13])                        |
+| **Monorepo guide**                    | Confirms absolute paths requirement for configs ([Railway Docs][6]) |
+
+---
+
+## 8  Troubleshooting Checklist
+
+1. **Wrong service picked during deploy** – always pass `--service` or run from the service folder ([Railway Help Station][9]).
+2. **Vars missing locally** – run `railway variables pull` again after you add/change any variable ([Railway Docs][8]).
+3. **Dockerfile ignored** – verify `builder":"DOCKERFILE"` and the custom path in `railway.json` ([Railway Docs][11], [Railway Docs][11]).
+4. **Frontend 404s on refresh** – nginx `try_files / /index.html;` already in your config; keep it ([Railway Docs][14]).
+
+Follow this workflow and you’ll be able to iterate quickly in the CLI, guarantee parity with production, and ship your FastAPI + React prediction app to Railway with confidence.
+
+[1]: https://station.railway.com/questions/react-python-app-not-building-or-gett-1d401155?utm_source=chatgpt.com "React + Python monorepo failing at runtime - Railway Help Station"
+[2]: https://blog.railway.com/p/multi-service-templates?utm_source=chatgpt.com "Multi-service templates - Railway Blog"
+[3]: https://docs.railway.com/reference/config-as-code?utm_source=chatgpt.com "Config as Code | Railway Docs"
+[4]: https://docs.railway.com/guides/config-as-code?utm_source=chatgpt.com "Using Config as Code - Railway Docs"
+[5]: https://station.railway.com/questions/how-to-split-the-build-process-from-1-re-95d0d205?utm_source=chatgpt.com "How to split the build process from 1 repo and deploying 2 different ..."
+[6]: https://docs.railway.com/guides/monorepo?utm_source=chatgpt.com "Deploying a Monorepo - Railway Docs"
+[7]: https://docs.railway.com/guides/cli?utm_source=chatgpt.com "Using the CLI - Railway Docs"
+[8]: https://docs.railway.com/guides/variables?utm_source=chatgpt.com "Using Variables - Railway Docs"
+[9]: https://station.railway.com/questions/specify-service-to-deploy-using-railway-de0b4425?utm_source=chatgpt.com "Specify service to deploy using `railway up`"
+[10]: https://station.railway.com/questions/how-to-get-two-services-actually-to-talk-d331e924?utm_source=chatgpt.com "How to get two services actually to talk to each other"
+[11]: https://docs.railway.com/guides/dockerfiles?utm_source=chatgpt.com "Build from a Dockerfile - Railway Docs"
+[12]: https://docs.railway.com/reference/production-readiness-checklist?utm_source=chatgpt.com "Production Readiness Checklist | Railway Docs"
+[13]: https://docs.railway.com/guides/logs?utm_source=chatgpt.com "Viewing Logs - Railway Docs"
+[14]: https://docs.railway.com/guides/react?utm_source=chatgpt.com "Deploy a React App - Railway Docs"

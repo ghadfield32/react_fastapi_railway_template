@@ -17,7 +17,7 @@ fi
 
 # Seed DB in the background so we never block readiness
 echo "🌱 Seeding database..."
-python api/scripts/seed_user.py &
+python scripts/seed_user.py &
 
 echo "🎯  Launching Uvicorn..."
 exec uvicorn app.main:app \
