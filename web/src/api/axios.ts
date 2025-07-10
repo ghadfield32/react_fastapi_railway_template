@@ -1,23 +1,28 @@
-import axios, { InternalAxiosRequestConfig } from 'axios';
+import axios, { InternalAxiosRequestConfig, AxiosHeaders } from 'axios';
 import { getStoredToken } from '../contexts/AuthContext';
 
-/**
- * Build a base-URL that is always absolute and always contains /api.
- * - dev  → proxy via Vite
- * - prod → value from VITE_API_URL (dashboard) + /api
- */
-const buildBaseURL = () => {
-  if (import.meta.env.DEV) return '/api';
-  const raw = (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '');
-  return `${raw}/api`;
-};
+// Augment ImportMeta to include Vite's env types
+declare global {
+  interface ImportMeta {
+    env: {
+      DEV: boolean;
+      PROD: boolean;
+      VITE_API_URL: string;
+    };
+  }
+}
 
-export const api = axios.create({ baseURL: buildBaseURL() });
+/**
+ * Get the normalized API root URL from Vite's environment.
+ * This is guaranteed to be a valid absolute URL by vite.config.ts
+ */
+const root = import.meta.env.VITE_API_URL.replace(/\/+$/, '');
+export const api = axios.create({ baseURL: `${root}/api` });
 
 api.interceptors.request.use((cfg: InternalAxiosRequestConfig) => {
   const t = getStoredToken();
   if (t) {
-    cfg.headers = cfg.headers ?? {};
+    if (!cfg.headers) cfg.headers = new AxiosHeaders();
     cfg.headers.Authorization = `Bearer ${t}`;
   }
   return cfg;

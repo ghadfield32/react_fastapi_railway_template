@@ -4,37 +4,28 @@ import react from '@vitejs/plugin-react'
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
+  const raw = env.VITE_API_URL || 
+              (mode === 'production'
+                ? 'https://fastapi-production-1d13.up.railway.app'
+                : 'http://127.0.0.1:8000')
 
-  // API URL configuration
-  // Development: local backend
-  // Production: Railway backend URL
-  const API_URL = env.VITE_API_URL || 
-    (mode === 'production' 
-      ? 'https://fastapi-production-1d13.up.railway.app' 
-      : 'http://127.0.0.1:8000')
+  /** Prepend https:// if the scheme is missing */
+  const API_URL = /^https?:\/\//.test(raw) ? raw.replace(/\/+$/, '') : `https://${raw}`
 
-  // Validate API URL in production to catch configuration errors early
-  if (mode === 'production' && !/^https?:\/\//.test(API_URL)) {
-    throw new Error(
-      `VITE_API_URL must include http(s):// and point at the backend – got "${API_URL}".`
-    );
+  // Final sanity-check – bail if still invalid
+  if (!/^https?:\/\/[^/]+$/.test(API_URL)) {
+    throw new Error(`VITE_API_URL must be an absolute URL (got "${API_URL}").`)
   }
 
   console.log('🔍 Vite Config Debug:')
   console.log('Mode:', mode)
-  console.log('API_URL:', API_URL)
-  console.log('VITE_API_URL from env:', env.VITE_API_URL)
+  console.log('Raw API_URL:', raw)
+  console.log('Normalized API_URL:', API_URL)
   console.log('All VITE_ env vars:', Object.keys(env).filter(key => key.startsWith('VITE_')))
-  console.log('NODE_ENV:', process.env.NODE_ENV)
-  console.log('PWD:', process.env.PWD)
-  console.log('Railway vars:', {
-    RAILWAY_ENVIRONMENT: process.env.RAILWAY_ENVIRONMENT,
-    RAILWAY_PROJECT_ID: process.env.RAILWAY_PROJECT_ID,
-    RAILWAY_SERVICE_NAME: process.env.RAILWAY_SERVICE_NAME
-  })
 
   return {
     plugins: [react()],
+    define: { __API_URL__: JSON.stringify(API_URL) },
     server: {
       host: '0.0.0.0',
       port: 5173,
@@ -62,7 +53,6 @@ export default defineConfig(({ mode }) => {
       outDir: 'dist',
       assetsDir: 'assets',
       sourcemap: false,
-      // Increase chunk size warning limit to avoid warnings
       chunkSizeWarningLimit: 1000,
       rollupOptions: {
         output: {
@@ -72,15 +62,10 @@ export default defineConfig(({ mode }) => {
         }
       }
     },
-    define: {
-      __API_URL__: JSON.stringify(API_URL)
-    },
-    // Ensure TypeScript errors don't fail the build in production
     esbuild: {
       logOverride: { 
         'this-is-undefined-in-esm': 'silent'
       },
-      // Handle TypeScript errors more gracefully
       target: 'es2020',
       keepNames: true
     }
