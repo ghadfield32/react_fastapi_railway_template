@@ -76,16 +76,16 @@ async def add_process_time_header(request: Request, call_next):
 @app.get("/api/health", status_code=status.HTTP_200_OK)
 async def api_health() -> dict[str, t.Any]:
     """
-    Lightweight readiness endpoint for Railway.  
-    It does **not** touch the database – we only need to know that this worker
-    finished startup.
+    Lightweight readiness probe; does **not** touch the DB.
+    The DB was already initialised synchronously in start.sh.
     """
     return {
         "status": "healthy",
-        "ready": True,          # start.sh guarantees DB was initialised
+        "ready": True,
         "timestamp": time.time(),
         "service": "FastAPI + React Template"
     }
+
 
 
 @app.get("/api/hello")
