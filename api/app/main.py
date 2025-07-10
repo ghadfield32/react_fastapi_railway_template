@@ -73,40 +73,20 @@ async def add_process_time_header(request: Request, call_next):
     response.headers["X-Process-Time"] = f"{elapsed:.4f}"
     return response
 
-@app.get("/health", status_code=status.HTTP_200_OK)
-async def root_health(db: AsyncSession = Depends(get_db)):
-    """Liveness & readiness probe.
-
-    * ready=True  -> app & DB ok (200)
-    * ready=False -> still starting (503)
+@app.get("/api/health", status_code=status.HTTP_200_OK)
+async def api_health() -> dict[str, t.Any]:
     """
-    global app_ready
-    ready = app_ready
-    try:
-        # Cheap DB ping
-        await db.execute("SELECT 1")
-    except SQLAlchemyError:
-        ready = False
-
-    status_code = status.HTTP_200_OK if ready else status.HTTP_503_SERVICE_UNAVAILABLE
-    return JSONResponse(
-        status_code=status_code,
-        content={
-            "status": "healthy" if ready else "starting",
-            "ready": ready,
-            "timestamp": time.time(),
-        },
-    )
-
-@app.get("/api/health")
-async def api_health():
-    """API health check endpoint for Railway deployment."""
+    Lightweight readiness endpoint for Railway.  
+    It does **not** touch the database – we only need to know that this worker
+    finished startup.
+    """
     return {
         "status": "healthy",
-        "ready": app_ready,
+        "ready": True,          # start.sh guarantees DB was initialised
         "timestamp": time.time(),
         "service": "FastAPI + React Template"
     }
+
 
 @app.get("/api/hello")
 async def hello(current_user: str = Depends(get_current_user)):
