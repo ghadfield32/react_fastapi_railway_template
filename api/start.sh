@@ -7,6 +7,11 @@ if [[ -z "${PORT:-}" ]]; then
   exit 1
 fi
 
+if [[ -z "${SECRET_KEY:-}" ]]; then
+  echo "❌  SECRET_KEY is not set for the backend service – aborting." >&2
+  exit 1
+fi
+
 echo "🚀  FastAPI boot; PORT=$PORT  PY=$(python -V)"
 env | grep -E 'RAILWAY_|PORT|DATABASE_URL' | sed 's/SECRET_KEY=.*/SECRET_KEY=***/'
 

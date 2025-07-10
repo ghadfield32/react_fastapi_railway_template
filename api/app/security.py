@@ -1,4 +1,3 @@
-# api/app/security.py
 from __future__ import annotations
 import os, logging, secrets
 from datetime import datetime, timedelta
@@ -12,23 +11,21 @@ from pydantic import BaseModel
 
 log = logging.getLogger(__name__)
 
-# ------------------------------------------------------------------
-# SECRET-KEY management
-# ------------------------------------------------------------------
+# ---------------------------------------------------------------------------
+# 1.  SECRET_KEY ***must*** be provided in the environment in production.
+# ---------------------------------------------------------------------------
 SECRET_KEY = os.getenv("SECRET_KEY")
-
 if not SECRET_KEY:
-    # Generate an ephemeral key so the app stays up in non-production
-    SECRET_KEY = secrets.token_urlsafe(32)
-    log.warning(
-        "✅ Generated temporary SECRET_KEY. "
-        "Set a real value in Railway > Variables before going to production!"
+    log.critical(
+        "ENV variable SECRET_KEY is missing -- generating a temporary key. "
+        "ALL issued JWTs will be invalid after a pod restart! "
+        "Set it in Railway → Variables to disable this warning."
     )
+    SECRET_KEY = secrets.token_urlsafe(32)   # fallback only for dev
 
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 30))
 
-# Crypto helpers
 pwd_ctx = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/token")
 
